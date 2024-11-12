@@ -90,6 +90,24 @@ window.addEventListener('wheel', function (e) {
     gameCamera.rotateX(-e.deltaX / 100);
 });
 
+var isDragging = false;
+
+window.addEventListener('mousedown', function (e) {
+    isDragging = true;
+});
+
+window.addEventListener('mouseup', function (e) {
+    isDragging = false;
+});
+
+window.addEventListener('mousemove', function (e) {
+    if (!camera || !isDragging) {
+        return;
+    }
+    gameCamera.rotateX(e.movementX / 100);
+    gameCamera.rotateY(-e.movementY / 100);
+});
+
 
 var world = new World();
 world.setIterations(4);
@@ -128,7 +146,7 @@ gltfLoader.load('scene.gltf', function (gltf) {
         if(child.isMesh){
             var box = new Box({ local: { body: { mass: Infinity } } }).fromMesh(child);
             box.setRestitution(0);
-            box.setFriction(1);
+            box.setFriction(999);
             box.setLocalFlag(Composite.FLAGS.STATIC, true);
 
             box.mesh = child.clone();
