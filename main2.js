@@ -95,6 +95,9 @@ var isDragging = false;
 window.addEventListener('mousedown', function (e) {
     isDragging = true;
 });
+document.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+});
 
 window.addEventListener('mouseup', function (e) {
     isDragging = false;
@@ -135,11 +138,11 @@ world.addComposite(player);
 
 var canJump = false;
 
-player.preCollisionCallback = function(contact){
-    if(contact.normal.dot(new Vector3(0,1,0)) < -0.75 && contact.body1.maxParent == this){
+player.preCollisionCallback = function (contact) {
+    if (contact.normal.dot(new Vector3(0, 1, 0)) < -0.75 && contact.body1.maxParent == this) {
         canJump = true;
     }
-    else if(contact.normal.dot(new Vector3(0,1,0)) > 0.75){
+    else if (contact.normal.dot(new Vector3(0, 1, 0)) > 0.75) {
         canJump = true;
     }
 }
@@ -150,7 +153,7 @@ var gltfLoader = new GLTFLoader();
 gltfLoader.load('scene.gltf', function (gltf) {
     scene.add(gltf.scene);
     gltf.scene.traverse(function (child) {
-        if(child.isMesh){
+        if (child.isMesh) {
             var box = new Box({ local: { body: { mass: Infinity } } }).fromMesh(child);
             box.setRestitution(0);
             box.setFriction(10);
@@ -158,14 +161,14 @@ gltfLoader.load('scene.gltf', function (gltf) {
 
             box.mesh = child.clone();
             world.addComposite(box);
-            if(child.name == "Box_13"){
-                box.preCollisionCallback = function(contact){
+            if (child.name == "Box_13") {
+                box.preCollisionCallback = function (contact) {
                     alert("you win!!!");
                 }
                 //player.global.body.setPosition(box.global.body.position.copy());
             }
         }
-        else{
+        else {
         }
     })
 });
@@ -225,7 +228,7 @@ function render() {
         world.step();
         steps++;
 
-        if(cameraControls.movement.up && canJump){
+        if (cameraControls.movement.up && canJump) {
             var vel = player.global.body.getVelocity();
             player.global.body.setVelocity(new Vector3(vel.x, vel.y + jumpStrength * world.deltaTime, vel.z));
             canJump = false;
@@ -247,6 +250,12 @@ function render() {
 
     }
 
+    if(player.global.body.position.y < -30){
+        player.global.body.setPosition(new Vector3(0, 40, 0));
+        player.global.body.setVelocity(new Vector3(0, 0, 0));
+        player.global.body.angularVelocity.reset();
+        player.global.body.rotation.reset();
+    }
 
 
     gameCamera.update(player.previousPosition.lerp(player.global.body.position, lerpAmount));
