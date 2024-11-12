@@ -112,9 +112,15 @@ window.addEventListener('mousemove', function (e) {
 var world = new World();
 world.setIterations(4);
 
+
+var jumpStrength = 0.75;
+var moveStrength = 0.05;
+var gravity = -0.2;
+
+
 var player = new Sphere({
     radius: 0.5,
-    global: { body: { acceleration: new Vector3(0, -0.1, 0), position: new Vector3(0, 40, 0) } },
+    global: { body: { acceleration: new Vector3(0, gravity, 0), position: new Vector3(0, 40, 0) } },
     local: { body: { mass: 1 } }
 });
 
@@ -128,6 +134,7 @@ player.addToScene(scene);
 world.addComposite(player);
 
 var canJump = false;
+
 player.preCollisionCallback = function(contact){
     if(contact.normal.dot(new Vector3(0,1,0)) < -0.75 && contact.body1.maxParent == this){
         canJump = true;
@@ -146,7 +153,7 @@ gltfLoader.load('scene.gltf', function (gltf) {
         if(child.isMesh){
             var box = new Box({ local: { body: { mass: Infinity } } }).fromMesh(child);
             box.setRestitution(0);
-            box.setFriction(999);
+            box.setFriction(10);
             box.setLocalFlag(Composite.FLAGS.STATIC, true);
 
             box.mesh = child.clone();
@@ -220,11 +227,11 @@ function render() {
 
         if(cameraControls.movement.up && canJump){
             var vel = player.global.body.getVelocity();
-            player.global.body.setVelocity(new Vector3(vel.x, vel.y + 0.5 * world.deltaTime, vel.z));
+            player.global.body.setVelocity(new Vector3(vel.x, vel.y + jumpStrength * world.deltaTime, vel.z));
             canJump = false;
         }
         var delta2 = cameraControls.getDelta(camera).scale(player.global.body.mass * world.deltaTime);
-        player.applyForce(delta2.scale(0.03), player.global.body.position);
+        player.applyForce(delta2.scale(moveStrength), player.global.body.position);
         stats.end();
     }
     var lerpAmount = (delta * fps - steps);
