@@ -101,7 +101,7 @@ var PhysicsBody3 = class {
         body.momentOfInertia = this.momentOfInertia.toJSON();
         body.inverseMomentOfInertia = this.inverseMomentOfInertia.toJSON();
 
-        body.position = this.position.toJSON;
+        body.position = this.position.toJSON();
         body.actualPreviousPosition = this.actualPreviousPosition.toJSON();
         body.previousPosition = this.previousPosition.toJSON();
         body.acceleration = this.acceleration.toJSON();

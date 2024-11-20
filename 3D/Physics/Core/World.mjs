@@ -40,7 +40,7 @@ var World = class {
 
     add(element) {
         element.id = (this.maxID++);
-        element.world = this;
+        element.setWorld(this);
         this.all[element.id] = element;
         return element;
     }

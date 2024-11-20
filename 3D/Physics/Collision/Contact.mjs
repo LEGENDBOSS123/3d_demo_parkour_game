@@ -25,7 +25,6 @@ var Contact = class {
         }
         var impactSpeed = this.velocity.dot(this.normal);
         var force = new Vector3();
-
         var restitution = this.material.restitution;
         var radius1 = this.point.subtract(this.body1.maxParent.global.body.position);
         var radius2 = this.point.subtract(this.body2.maxParent.global.body.position);
@@ -35,18 +34,30 @@ var Contact = class {
         rotationalEffects1 = isFinite(rotationalEffects1) ? rotationalEffects1 : 0;
         rotationalEffects2 = isFinite(rotationalEffects2) ? rotationalEffects2 : 0;
 
-        // rotationalEffects1 = 0;
-        // rotationalEffects2 = 0;
+        var tangential = this.velocity.projectOntoPlane(this.normal);
+        var tangentialNorm = tangential.normalize();
+        var rotationalEffects1Fric = tangentialNorm.dot(this.body1.maxParent.global.body.inverseMomentOfInertia.multiplyVector3(radius1.cross(tangentialNorm)).cross(radius1));
+        var rotationalEffects2Fric = tangentialNorm.dot(this.body2.maxParent.global.body.inverseMomentOfInertia.multiplyVector3(radius2.cross(tangentialNorm)).cross(radius2));
+        rotationalEffects1Fric = isFinite(rotationalEffects1Fric) ? rotationalEffects1Fric : 0;
+        rotationalEffects2Fric = isFinite(rotationalEffects2Fric) ? rotationalEffects2Fric : 0;
+        
         var denominator = this.body1.maxParent.global.body.inverseMass + rotationalEffects1;
+
         denominator += this.body2.maxParent.global.body.inverseMass + rotationalEffects2;
+
+        var denominatorFric = this.body1.maxParent.global.body.inverseMass + rotationalEffects1Fric;
+
+        denominatorFric += this.body2.maxParent.global.body.inverseMass + rotationalEffects2Fric;
+        
+
         var impulse = - (1 + restitution) * impactSpeed / denominator;
 
         if (impulse < 0) {
             impulse = 0;
         }
 
-        var tangential = this.velocity.projectOntoPlane(this.normal);
-        var maxFriction = tangential.magnitude() / denominator * 0.5;
+        
+        var maxFriction = tangential.magnitude() / denominatorFric;
         tangential.normalizeInPlace();
         var friction = impulse * this.material.friction;
         force.addInPlace(tangential.scale(-1 * Math.max(0, Math.min(maxFriction, friction))));

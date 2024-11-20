@@ -59,6 +59,12 @@ var Composite = class {
         this.material.setFriction(friction);
         return this;
     }
+
+    setWorld(world) {
+        this.world = world;
+        return this;
+    }
+
     translateWorldToLocal(v) {
         return this.global.body.rotation.conjugate().multiplyVector3(v.subtract(this.global.body.position));
     }
