@@ -16,7 +16,7 @@ import Contact from "./3D/Physics/Collision/Contact.mjs";
 import CollisionDetector from "./3D/Physics/Collision/CollisionDetector.mjs";
 import SimpleCameraControls from "./3D/SimpleCameraControls.js";
 import CameraTHREEJS from "./3D/CameraTHREEJS.js";
-
+import Player from "./Player.mjs";
 import Keysheld from "./3D/Web/Keysheld.mjs";
 
 import TextureManager from "./3D/Graphics/TextureManager.mjs"
@@ -32,9 +32,15 @@ document.body.appendChild(stats.dom);
 
 
 var renderer = new THREE.WebGLRenderer();
-
+top.renderer = renderer;
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1;
+renderer.physicallyCorrectLights = true;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8CBED6);
@@ -73,8 +79,22 @@ var ambientLight = new THREE.AmbientLight(0xbbbbbb);
 scene.add(ambientLight);
 
 var light = new THREE.DirectionalLight(0xffffff, 3);
-light.position.set(-2, 10, 5);
+light.direction = new THREE.Vector3(2,-10,5).normalize();
+light.castShadow = true;
+light.shadow.mapSize.width = 4096;
+light.shadow.mapSize.height = 4096;
+var range = 512;
+light.shadow.camera.near = 0.5;
+light.shadow.camera.far = 4096;
+light.shadow.camera.left = -range;
+light.shadow.camera.right = range;
+light.shadow.camera.top = range;
+light.shadow.camera.bottom = -range;
+top.light = light;
 scene.add(light);
+scene.add(light.target);
+
+
 
 
 
@@ -121,7 +141,7 @@ var moveStrength = 0.05;
 var gravity = -0.2;
 
 
-var player = new Sphere({
+var player = new Player({
     radius: 0.5,
     global: { body: { acceleration: new Vector3(0, gravity, 0), position: new Vector3(0, 40, 0) } },
     local: { body: { mass: 1 } }
@@ -131,14 +151,12 @@ player.setMesh({
     material: new THREE.MeshPhongMaterial({ map: textureManager.get("rug"), wireframe: false })
 }, THREE);
 
-player.setLocalFlag(Composite.FLAGS.CENTER_OF_MASS, true);
 
 player.addToScene(scene);
 world.addComposite(player);
-
 var canJump = false;
 
-player.preCollisionCallback = function (contact) {
+player.spheres[0].preCollisionCallback = function (contact) {
     if (contact.normal.dot(new Vector3(0, 1, 0)) < -0.75 && contact.body1.maxParent == this) {
         canJump = true;
     }
@@ -146,27 +164,36 @@ player.preCollisionCallback = function (contact) {
         canJump = true;
     }
 }
-player.syncAll();
+
 
 var gltfLoader = new GLTFLoader();
 
-gltfLoader.load('scene.gltf', function (gltf) {
-    scene.add(gltf.scene);
+gltfLoader.load('untitled.glb', function (gltf) {
+    gltf.scene.castShadow = true;
+    gltf.scene.receiveShadow = true;
     gltf.scene.traverse(function (child) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        
+        
+        
         if (child.isMesh) {
             var box = new Box({ local: { body: { mass: Infinity } } }).fromMesh(child);
             box.setRestitution(0);
             box.setFriction(10);
             box.setLocalFlag(Composite.FLAGS.STATIC, true);
 
-            box.mesh = child.clone();
+            box.mesh = child;
             world.addComposite(box);
-            if (child.name == "Box_13") {
-                box.preCollisionCallback = function (contact) {
-                    alert("you win!!!");
-                }
-                //player.global.body.setPosition(box.global.body.position.copy());
-            }
+            //box.addToScene(scene);
+            // if (child.name == "Cube") {
+            //     // box.preCollisionCallback = function (contact) {
+            //     //     alert("you win!!!");
+            //     // }
+            //     player.global.body.setPosition(box.global.body.position.add(new Vector3(0, 10, 0)));
+                
+            // }
+            scene.add(child.clone());
         }
         else {
         }
@@ -225,7 +252,19 @@ function render() {
             child.previousPosition = child.global.body.position.copy();
             child.previousRotation = child.global.body.rotation.copy();
         }
+        if(player.global.body.position.y < -30){
+            player.global.body.setPosition(new Vector3(0, 40, 0));
+            player.global.body.actualPreviousPosition = new Vector3(0, 40, 0);
+            
+            player.global.body.setVelocity(new Vector3(0, 0, 0));
+            player.global.body.angularVelocity.reset();
+            player.global.body.rotation.reset();
+            player.global.body.previousRotation.reset();
+            player.global.body.netForce.reset();
+            player.syncAll();
+        }
         world.step();
+        
         steps++;
 
         if (cameraControls.movement.up && canJump) {
@@ -233,8 +272,9 @@ function render() {
             player.global.body.setVelocity(new Vector3(vel.x, vel.y + jumpStrength * world.deltaTime, vel.z));
             canJump = false;
         }
-        var delta2 = cameraControls.getDelta(camera).scale(player.global.body.mass * world.deltaTime);
-        player.applyForce(delta2.scale(moveStrength), player.global.body.position);
+        var delta2 = cameraControls.getDelta(camera).scale(player.global.body.mass * world.deltaTime).scale(moveStrength);
+        player.applyForce(delta2, player.global.body.position);
+        
         stats.end();
     }
     var lerpAmount = (delta * fps - steps);
@@ -250,18 +290,16 @@ function render() {
 
     }
 
-    if(player.global.body.position.y < -30){
-        player.global.body.setPosition(new Vector3(0, 40, 0));
-        player.global.body.setVelocity(new Vector3(0, 0, 0));
-        player.global.body.angularVelocity.reset();
-        player.global.body.rotation.reset();
-    }
+   
 
 
     gameCamera.update(player.previousPosition.lerp(player.global.body.position, lerpAmount));
     if (skyboxMesh) {
         skyboxMesh.position.copy(camera.position);
     }
+    light.position.copy(camera.position);
+    light.position.sub(light.direction.clone().multiplyScalar(light.shadow.camera.far * 0.5));
+    light.target.position.addVectors(light.position, light.direction);
     renderer.render(scene, camera);
     requestAnimationFrame(render);
 }
