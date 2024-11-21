@@ -139,11 +139,12 @@ world.setIterations(4);
 var jumpStrength = 0.75;
 var moveStrength = 0.05;
 var gravity = -0.2;
+var spawnPoint = new Vector3(0, 40, 0);
 
 
 var player = new Player({
     radius: 0.5,
-    global: { body: { acceleration: new Vector3(0, gravity, 0), position: new Vector3(0, 40, 0) } },
+    global: { body: { acceleration: new Vector3(0, gravity, 0), position: spawnPoint.copy() } },
     local: { body: { mass: 1 } }
 });
 
@@ -185,14 +186,16 @@ gltfLoader.load('untitled.glb', function (gltf) {
 
             box.mesh = child;
             world.addComposite(box);
-            //box.addToScene(scene);
-            // if (child.name == "Cube") {
-            //     // box.preCollisionCallback = function (contact) {
-            //     //     alert("you win!!!");
-            //     // }
-            //     player.global.body.setPosition(box.global.body.position.add(new Vector3(0, 10, 0)));
-                
-            // }
+            if (child.name.toLowerCase().includes("checkpoint")) {
+                box.preCollisionCallback = function (contact) {
+                    if(contact.body1.maxParent == player){
+                        spawnPoint = contact.body2.global.body.position;
+                    }
+                    else if(contact.body2.maxParent == player){
+                        spawnPoint = contact.body1.global.body.position;
+                    }
+                }                
+            }
             scene.add(child.clone());
         }
         else {
@@ -253,8 +256,8 @@ function render() {
             child.previousRotation = child.global.body.rotation.copy();
         }
         if(player.global.body.position.y < -30){
-            player.global.body.setPosition(new Vector3(0, 40, 0));
-            player.global.body.actualPreviousPosition = new Vector3(0, 40, 0);
+            player.global.body.setPosition(spawnPoint.copy());
+            player.global.body.actualPreviousPosition = player.global.body;
             
             player.global.body.setVelocity(new Vector3(0, 0, 0));
             player.global.body.angularVelocity.reset();
