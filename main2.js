@@ -126,17 +126,21 @@ document.addEventListener('contextmenu', (event) => {
     event.preventDefault();
 });
 
+var respawn = function(){
+    player.global.body.setPosition(spawnPoint.copy());
+    player.global.body.actualPreviousPosition = player.global.body;
+    
+    player.global.body.setVelocity(new Vector3(0, 0, 0));
+    player.global.body.angularVelocity.reset();
+    player.global.body.rotation.reset();
+    player.global.body.previousRotation.reset();
+    player.global.body.netForce.reset();
+    player.syncAll();
+}
+
 window.addEventListener('keydown', function (e) {
     if(e.key == "r"){
-        player.global.body.setPosition(spawnPoint.copy());
-        player.global.body.actualPreviousPosition = player.global.body;
-        
-        player.global.body.setVelocity(new Vector3(0, 0, 0));
-        player.global.body.angularVelocity.reset();
-        player.global.body.rotation.reset();
-        player.global.body.previousRotation.reset();
-        player.global.body.netForce.reset();
-        player.syncAll();
+        respawn();
         return;
     }
     if(e.key == "Shift"){
@@ -231,9 +235,10 @@ gltfLoader.load('untitled.glb', function (gltf) {
 
             box.mesh = child;
             world.addComposite(box);
-            if (child.name.toLowerCase().includes("checkpoint")) {
-                if(child.name == "checkpoint_2001"){
-                    //spawnPoint = box.global.body.position;
+            if (child.name.toLowerCase().includes("checkpoint") || child.name.toLowerCase().includes("spawn")) {
+                console.log(child.name);
+                if(child.name.toLowerCase().includes("spawn")){
+                    spawnPoint = box.global.body.position;
                 }
                 box.preCollisionCallback = function (contact) {
                     if(contact.body1.maxParent == player){
@@ -242,13 +247,15 @@ gltfLoader.load('untitled.glb', function (gltf) {
                     else if(contact.body2.maxParent == player){
                         spawnPoint = contact.body1.global.body.position;
                     }
-                }                
+                }
             }
             scene.add(child.clone());
         }
         else {
         }
     })
+    respawn();
+
 });
 
 
@@ -304,15 +311,7 @@ function render() {
             child.previousRotation = child.global.body.rotation.copy();
         }
         if(player.global.body.position.y < -30){
-            player.global.body.setPosition(spawnPoint.copy());
-            player.global.body.actualPreviousPosition = player.global.body;
-            
-            player.global.body.setVelocity(new Vector3(0, 0, 0));
-            player.global.body.angularVelocity.reset();
-            player.global.body.rotation.reset();
-            player.global.body.previousRotation.reset();
-            player.global.body.netForce.reset();
-            player.syncAll();
+            respawn();
         }
         world.step();
         
