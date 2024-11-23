@@ -31,10 +31,11 @@ stats.showPanel(0);
 document.body.appendChild(stats.dom);
 
 
-var renderer = new THREE.WebGLRenderer();
+var renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById("canvas")
+});
 top.renderer = renderer;
 renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
 
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1;
@@ -48,6 +49,11 @@ scene.background = new THREE.Color(0x8CBED6);
 var camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 15000);
 scene.add(camera);
 
+window.addEventListener('resize', () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+});
 
 var textureManager = new TextureManager({
     loader: new THREE.TextureLoader()
@@ -112,6 +118,7 @@ window.addEventListener('wheel', function (e) {
 
 var isDragging = false;
 var shiftLocked = false;
+var shiftLockCursor = document.getElementById('shiftlockcursor');
 window.addEventListener('mousedown', function (e) {
     isDragging = true;
 });
@@ -148,8 +155,11 @@ window.addEventListener('keydown', function (e) {
 document.addEventListener("pointerlockchange", function(e){
     if (document.pointerLockElement) {
         shiftLocked = true;
+        shiftLockCursor.style.display = "block";
+
     } else {
         shiftLocked = false;
+        shiftLockCursor.style.display = "none";
     }
 }, false);
 
