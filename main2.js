@@ -119,6 +119,20 @@ document.addEventListener('contextmenu', (event) => {
     event.preventDefault();
 });
 
+window.addEventListener('keydown', function (e) {
+    if(e.key == "r"){
+        player.global.body.setPosition(spawnPoint.copy());
+        player.global.body.actualPreviousPosition = player.global.body;
+        
+        player.global.body.setVelocity(new Vector3(0, 0, 0));
+        player.global.body.angularVelocity.reset();
+        player.global.body.rotation.reset();
+        player.global.body.previousRotation.reset();
+        player.global.body.netForce.reset();
+        player.syncAll();
+    }
+});
+
 window.addEventListener('mouseup', function (e) {
     isDragging = false;
 });
@@ -187,6 +201,9 @@ gltfLoader.load('untitled.glb', function (gltf) {
             box.mesh = child;
             world.addComposite(box);
             if (child.name.toLowerCase().includes("checkpoint")) {
+                if(child.name == "checkpoint_2001"){
+                    //spawnPoint = box.global.body.position;
+                }
                 box.preCollisionCallback = function (contact) {
                     if(contact.body1.maxParent == player){
                         spawnPoint = contact.body2.global.body.position;
