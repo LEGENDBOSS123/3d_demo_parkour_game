@@ -111,7 +111,7 @@ window.addEventListener('wheel', function (e) {
 });
 
 var isDragging = false;
-
+var shiftLocked = false;
 window.addEventListener('mousedown', function (e) {
     isDragging = true;
 });
@@ -130,15 +130,36 @@ window.addEventListener('keydown', function (e) {
         player.global.body.previousRotation.reset();
         player.global.body.netForce.reset();
         player.syncAll();
+        return;
+    }
+    if(e.key == "Shift"){
+        if(!shiftLocked){
+            renderer.domElement.requestPointerLock({
+                unadjustedMovement: true,
+            });
+        }
+        else{
+            document.exitPointerLock();
+        }
+       
     }
 });
+
+document.addEventListener("pointerlockchange", function(e){
+    if (document.pointerLockElement) {
+        shiftLocked = true;
+    } else {
+        shiftLocked = false;
+    }
+}, false);
+
 
 window.addEventListener('mouseup', function (e) {
     isDragging = false;
 });
 
 window.addEventListener('mousemove', function (e) {
-    if (!camera || !isDragging) {
+    if (!camera || (!isDragging && !shiftLocked)) {
         return;
     }
     gameCamera.rotateX(e.movementX / 100);
