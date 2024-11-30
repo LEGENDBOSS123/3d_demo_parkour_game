@@ -25,6 +25,13 @@ import TextureManager from "./3D/Graphics/TextureManager.mjs"
 
 import * as THREE from "three";
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+var gltfLoader = new GLTFLoader();
+
+import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
+var exrLoader = new EXRLoader();
+
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+var rgbeLoader = new RGBELoader();
 
 var stats = new Stats();
 stats.showPanel(0);
@@ -34,6 +41,10 @@ document.body.appendChild(stats.dom);
 var renderer = new THREE.WebGLRenderer({
     canvas: document.getElementById("canvas")
 });
+
+var pmremGenerator = new THREE.PMREMGenerator(renderer);
+
+
 top.renderer = renderer;
 renderer.setSize(window.innerWidth, window.innerHeight);
 
@@ -56,39 +67,41 @@ window.addEventListener('resize', () => {
 });
 
 var textureManager = new TextureManager({
-    loader: new THREE.TextureLoader()
+    loader: new THREE.TextureLoader(),
+    extraLoaders: {
+        "exr": exrLoader
+    }
 });
 
 textureManager.loadAll([
-    { name: "skybox sky", file: "autumn_field_puresky.jpg" },
-    { name: "skybox garden", file: "garden_skybox.jpg" },
-    { name: "skybox hill", file: "red_hill_cloudy.jpg" },
+    { name: "rug", file: "rug.jpg" },
     { name: "grass", file: "grass.png" },
-    { name: "rocky ground", file: "rockyGround.jpg" },
-    { name: "rug", file: "rug.jpg" }
+    { name: "rocky ground", file: "rockyGround.jpg" }
 ]);
 
 
 
 
-var skybox = new THREE.SphereGeometry(10000, 64, 64);
-var skyboxMaterial = new THREE.MeshBasicMaterial({ map: textureManager.get("skybox sky"), side: THREE.BackSide });
-var skyboxMesh = new THREE.Mesh(skybox, skyboxMaterial);
-scene.add(skyboxMesh);
 
+
+rgbeLoader.load("3D/Graphics/Textures/autumn_field_puresky_8k.hdr", function (texture) {
+    var envMap = pmremGenerator.fromEquirectangular(texture).texture;
+    scene.background = envMap;
+    scene.environment = envMap;
+})
 
 const axesHelper = new THREE.AxesHelper(100);
 scene.add(axesHelper);
 
 
-var ambientLight = new THREE.AmbientLight(0xbbbbbb);
-scene.add(ambientLight);
+// var ambientLight = new THREE.AmbientLight(0xbbbbbb);
+// scene.add(ambientLight);
 
 var light = new THREE.DirectionalLight(0xffffff, 3);
-light.direction = new THREE.Vector3(2,-10,5).normalize();
+light.direction = new THREE.Vector3(-2, -8, -5).normalize();
 light.castShadow = true;
-light.shadow.mapSize.width = 4096;
-light.shadow.mapSize.height = 4096;
+light.shadow.mapSize.width = 8192;
+light.shadow.mapSize.height = 8192;
 var range = 512;
 light.shadow.camera.near = 0.5;
 light.shadow.camera.far = 4096;
@@ -126,10 +139,10 @@ document.addEventListener('contextmenu', (event) => {
     event.preventDefault();
 });
 
-var respawn = function(){
+var respawn = function () {
     player.global.body.setPosition(spawnPoint.copy());
     player.global.body.actualPreviousPosition = player.global.body;
-    
+
     player.global.body.setVelocity(new Vector3(0, 0, 0));
     player.global.body.angularVelocity.reset();
     player.global.body.rotation.reset();
@@ -139,24 +152,24 @@ var respawn = function(){
 }
 
 window.addEventListener('keydown', function (e) {
-    if(e.key == "r"){
+    if (e.key == "r") {
         respawn();
         return;
     }
-    if(e.key == "Shift"){
-        if(!shiftLocked){
+    if (e.key == "Shift") {
+        if (!shiftLocked) {
             renderer.domElement.requestPointerLock({
                 unadjustedMovement: true,
             });
         }
-        else{
+        else {
             document.exitPointerLock();
         }
-       
+
     }
 });
 
-document.addEventListener("pointerlockchange", function(e){
+document.addEventListener("pointerlockchange", function (e) {
     if (document.pointerLockElement) {
         shiftLocked = true;
         shiftLockCursor.style.display = "block";
@@ -197,9 +210,26 @@ var player = new Player({
     local: { body: { mass: 1 } }
 });
 
-player.setMesh({
-    material: new THREE.MeshPhongMaterial({ map: textureManager.get("rug"), wireframe: false })
-}, THREE);
+// player.setMesh({
+//     material: new THREE.MeshStandardMaterial({
+//         map: textureManager.get("rug"),
+//         wireframe: false
+//     })
+// }, THREE);
+
+gltfLoader.load('3D/Graphics/Textures/metal_grate_rusty_1k.gltf/metal_grate_rusty_1k.gltf', function (gltf) {
+    player.mesh = gltf.scene;
+    player.mesh.traverse(function (child) {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+        }
+    })
+    var scaleFactor = 4;
+    player.mesh.scale.set(player.children[0].radius * scaleFactor, player.children[0].radius * scaleFactor, player.children[0].radius * scaleFactor);
+    scene.add(player.mesh);
+    top.player = player;
+});
 
 
 player.addToScene(scene);
@@ -216,48 +246,47 @@ player.spheres[0].preCollisionCallback = function (contact) {
 }
 
 
-var gltfLoader = new GLTFLoader();
+for (var i = 0; i < 1; i++) {
+    gltfLoader.load('untitled.glb', function (gltf) {
+        gltf.scene.castShadow = true;
+        gltf.scene.receiveShadow = true;
+        gltf.scene.traverse(function (child) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            //child.position.x += Math.random()*10000
 
-gltfLoader.load('untitled.glb', function (gltf) {
-    gltf.scene.castShadow = true;
-    gltf.scene.receiveShadow = true;
-    gltf.scene.traverse(function (child) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        
-        
-        
-        if (child.isMesh) {
-            var box = new Box({ local: { body: { mass: Infinity } } }).fromMesh(child);
-            box.setRestitution(0);
-            box.setFriction(10);
-            box.setLocalFlag(Composite.FLAGS.STATIC, true);
 
-            box.mesh = child;
-            world.addComposite(box);
-            if (child.name.toLowerCase().includes("checkpoint") || child.name.toLowerCase().includes("spawn")) {
-                console.log(child.name);
-                if(child.name.toLowerCase().includes("spawn")){
-                    spawnPoint = box.global.body.position;
-                }
-                box.preCollisionCallback = function (contact) {
-                    if(contact.body1.maxParent == player){
-                        spawnPoint = contact.body2.global.body.position;
+
+            if (child.isMesh) {
+                var box = new Box({ local: { body: { mass: Infinity } } }).fromMesh(child);
+                box.setRestitution(0);
+                box.setFriction(10);
+                box.setLocalFlag(Composite.FLAGS.STATIC, true);
+
+                box.mesh = child;
+                world.addComposite(box);
+                if (child.name.toLowerCase().includes("checkpoint") || child.name.toLowerCase().includes("spawn")) {
+                    if (child.name.toLowerCase().includes("spawn")) {
+                        spawnPoint = box.global.body.position;
                     }
-                    else if(contact.body2.maxParent == player){
-                        spawnPoint = contact.body1.global.body.position;
+                    box.preCollisionCallback = function (contact) {
+                        if (contact.body1.maxParent == player) {
+                            spawnPoint = contact.body2.global.body.position;
+                        }
+                        else if (contact.body2.maxParent == player) {
+                            spawnPoint = contact.body1.global.body.position;
+                        }
                     }
                 }
+                scene.add(child.clone());
             }
-            scene.add(child.clone());
-        }
-        else {
-        }
-    })
-    respawn();
+            else {
+            }
+        })
+        respawn();
 
-});
-
+    });
+}
 
 
 
@@ -310,11 +339,11 @@ function render() {
             child.previousPosition = child.global.body.position.copy();
             child.previousRotation = child.global.body.rotation.copy();
         }
-        if(player.global.body.position.y < -30){
+        if (player.global.body.position.y < -30) {
             respawn();
         }
         world.step();
-        
+
         steps++;
 
         if (cameraControls.movement.up && canJump) {
@@ -324,8 +353,8 @@ function render() {
         }
         var delta2 = cameraControls.getDelta(camera).scale(player.global.body.mass * world.deltaTime).scale(moveStrength);
         player.applyForce(delta2, player.global.body.position);
-        
         stats.end();
+
     }
     var lerpAmount = (delta * fps - steps);
     for (var child of world.composites) {
@@ -340,13 +369,10 @@ function render() {
 
     }
 
-   
+
 
 
     gameCamera.update(player.previousPosition.lerp(player.global.body.position, lerpAmount));
-    if (skyboxMesh) {
-        skyboxMesh.position.copy(camera.position);
-    }
     light.position.copy(camera.position);
     light.position.sub(light.direction.clone().multiplyScalar(light.shadow.camera.far * 0.5));
     light.target.position.addVectors(light.position, light.direction);
