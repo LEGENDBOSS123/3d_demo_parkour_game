@@ -27,11 +27,19 @@ var CollisionDetector = class {
     }
 
     addPair(shape1, shape2) {
-        if (shape1 == shape2) {
+        if(!shape1.canCollideWith(shape2)){
             return;
         }
-        if (shape1.id > shape2.id) {
-            return this.pairs.set(shape2.id + this.constructor.seperatorCharacter + shape1.id, [shape2, shape1]);
+        if(!shape1.global.hitbox.intersects(shape2.global.hitbox)){
+            return;
+        }
+        if(shape1.id > shape2.id){
+            var temp = shape1;
+            shape1 = shape2;
+            shape2 = temp;
+        }
+        if(!this.handlers[shape1.shape]?.[shape2.shape]){
+            return;
         }
         return this.pairs.set(shape1.id + this.constructor.seperatorCharacter + shape2.id, [shape1, shape2]);
     }
@@ -59,10 +67,8 @@ var CollisionDetector = class {
 
         this.handlers[Composite.SHAPES.TERRAIN3] = {};
         this.handlers[Composite.SHAPES.TERRAIN3][Composite.SHAPES.POINT] = this.handleTerrainPoint;
-        this.handlers[Composite.SHAPES.TERRAIN3][Composite.SHAPES.BOX] = this.handleTerrainBox;
 
         this.handlers[Composite.SHAPES.BOX] = {};
-        this.handlers[Composite.SHAPES.BOX][Composite.SHAPES.BOX] = this.handleBoxBox;
     }
 
     handle(shape) {
@@ -164,166 +170,6 @@ var CollisionDetector = class {
         this.contacts.length = 0;
     }
 
-    handleTerrainBox(terrain1, box1) {
-        var width = box1.width / 2;
-        var height = box1.height / 2;
-        var depth = box1.depth / 2;
-        var vertices = [
-            new Vector3(-width, -height, -depth),
-            new Vector3(-width, -height, depth),
-            new Vector3(-width, height, -depth),
-            new Vector3(-width, height, depth),
-            new Vector3(width, -height, -depth),
-            new Vector3(width, -height, depth),
-            new Vector3(width, height, -depth),
-            new Vector3(width, height, depth)
-        ];
-        return this.handleTerrainPoint(terrain1, box1);
-    }
-
-    projectVerticiesOnAxis(verticies, axis) {
-        var min = Infinity;
-        var max = -Infinity;
-        var maxVertex = null;
-        var minVertex = null;
-        for (var i = 0; i < verticies.length; i++) {
-            var projection = verticies[i].dot(axis);
-            if (projection < min) {
-                min = projection;
-                minVertex = verticies[i];
-            }
-            if (projection > max) {
-                max = projection;
-                maxVertex = verticies[i];
-            }
-        }
-        return { min: min, max: max, minVertex: minVertex, maxVertex: maxVertex };
-    }
-
-    calculateContactPointsFromSeperatingAxisTheorem(shape1, shape2, verticies1, verticies2, penetration, normal) {
-        var contactPoints = [];
-        contactPoints.push(shape1.global.body.position.add(shape2.global.body.position).scale(0.5));
-        //code this part
-        return contactPoints;
-    }
-
-    seperatingAxisTheorem(shape1, shape2, verticies1, verticies2, axes) {
-        var penetration = Infinity;
-        var normal = null;
-        for (var i = 0; i < axes.length; i++) {
-            var axis = axes[i].normalizeInPlace();
-            if (axis.magnitudeSquared() < 0.0001) {
-                continue;
-            }
-            var minmax1 = this.projectVerticiesOnAxis(verticies1, axis);
-            var minmax2 = this.projectVerticiesOnAxis(verticies2, axis);
-            var overlap = Math.min(minmax1.max, minmax2.max) - Math.max(minmax1.min, minmax2.min);
-            if (overlap < 0) {
-                return null;
-            }
-            if (overlap < penetration) {
-                penetration = overlap;
-                normal = axis;
-            }
-        }
-        if (normal == null) {
-            return null;
-        }
-        if (shape1.global.body.position.subtract(shape2.global.body.position).dot(normal) < 0) {
-            normal = normal.scale(-1);
-        }
-        return { penetration: penetration, normal: normal, contactPoints: this.calculateContactPointsFromSeperatingAxisTheorem(shape1, shape2, verticies1, verticies2, penetration, normal) };
-    }
-
-    handleBoxBox(box1, box2) {
-        var box1Axes = [
-            box1.global.body.rotation.multiplyVector3(new Vector3(1, 0, 0)),
-            box1.global.body.rotation.multiplyVector3(new Vector3(0, 1, 0)),
-            box1.global.body.rotation.multiplyVector3(new Vector3(0, 0, 1)),
-        ]
-
-        var box2Axes = [
-            box2.global.body.rotation.multiplyVector3(new Vector3(1, 0, 0)),
-            box2.global.body.rotation.multiplyVector3(new Vector3(0, 1, 0)),
-            box2.global.body.rotation.multiplyVector3(new Vector3(0, 0, 1)),
-        ]
-
-        var axes = [
-            box1Axes[0],
-            box1Axes[1],
-            box1Axes[2],
-            box2Axes[0],
-            box2Axes[1],
-            box2Axes[2],
-            box1Axes[0].cross(box2Axes[0]),
-            box1Axes[0].cross(box2Axes[1]),
-            box1Axes[0].cross(box2Axes[2]),
-            box1Axes[1].cross(box2Axes[0]),
-            box1Axes[1].cross(box2Axes[1]),
-            box1Axes[1].cross(box2Axes[2]),
-            box1Axes[2].cross(box2Axes[0]),
-            box1Axes[2].cross(box2Axes[1]),
-            box1Axes[2].cross(box2Axes[2])
-        ];
-
-        var result = this.seperatingAxisTheorem(box1, box2, box1.getVerticies(), box2.getVerticies(), axes);
-        if (result == null) {
-            return null;
-        }
-        for (var i = 0; i < result.contactPoints.length; i++) {
-            var contact = new Contact();
-            contact.penetration = result.penetration;
-            contact.normal = result.normal;
-            contact.point = result.contactPoints[i];
-            contact.body1 = box1;
-            contact.body2 = box2;
-            contact.velocity = box1.getVelocityAtPosition(contact.point).subtractInPlace(box2.getVelocityAtPosition(contact.point));
-            this.addContact(contact);
-        }
-
-        return true;
-    }
-
-    intersectionBoxTriangle(box1, triangle1) {
-        var vertices = [
-            new Vector3(-box1.width / 2, -box1.height / 2, -box1.depth / 2),
-            new Vector3(-box1.width / 2, -box1.height / 2, box1.depth / 2),
-            new Vector3(-box1.width / 2, box1.height / 2, -box1.depth / 2),
-            new Vector3(-box1.width / 2, box1.height / 2, box1.depth / 2),
-            new Vector3(box1.width / 2, -box1.height / 2, -box1.depth / 2),
-            new Vector3(box1.width / 2, -box1.height / 2, box1.depth / 2),
-            new Vector3(box1.width / 2, box1.height / 2, -box1.depth / 2),
-            new Vector3(box1.width / 2, box1.height / 2, box1.depth / 2)
-        ];
-        var points = [];
-        for (var i = 0; i < 8; i++) {
-            var point = vertices[i];
-            if (triangle1.containsPoint(point)) {
-                points.push(point);
-            }
-        }
-        if (points.length == 0) {
-            return false;
-        }
-        var closestPoint = points[0];
-        var minDistance = Infinity;
-        for (var i = 1; i < points.length; i++) {
-            var distance = points[i].distanceSquared(box1.translateWorldToLocal(triangle1.a));
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestPoint = points[i];
-            }
-        }
-        var contact = new Contact();
-        contact.point = closestPoint;
-        contact.normal = triangle1.getNormal();
-        contact.penetration = contact.normal.scale(box1.translateWorldToLocal(triangle1.a).distanceTo(closestPoint));
-        contact.body1 = box1;
-        contact.body2 = triangle1;
-        this.addContact(contact);
-        return true;
-    }
-
     getClosestPointToAABB(v, aabb) {
         var dimensions = new Vector3(aabb.width, aabb.height, aabb.depth).scale(0.5);
         if(v.x > -dimensions.x && v.x < dimensions.x && v.y > -dimensions.y && v.y < dimensions.y && v.z > -dimensions.z && v.z < dimensions.z) {
@@ -349,57 +195,7 @@ var CollisionDetector = class {
         }
         return v;
     }
-    sphereSegmentAABBIntersection(P0, P1, radius, AABB) {
-        const dx = P1.x - P0.x; // Direction vector x
-        const dy = P1.y - P0.y; // Direction vector y
-        const dz = P1.z - P0.z; // Direction vector z
-
-        // Extend AABB by the sphere's radius
-        const w = AABB.x / 2 + radius; // Width of the extended AABB
-        const h = AABB.y / 2 + radius; // Height of the extended AABB
-        const d = AABB.z / 2 + radius; // Depth of the extended AABB
-
-        // Initialize t min and max values
-        let tMin = 0;
-        let tMax = 1;
-
-        // Calculate t values for x-axis
-        if (dx !== 0) {
-            const tMinX = (-w - P0.x) / dx;
-            const tMaxX = (w - P0.x) / dx;
-            tMin = Math.max(tMin, Math.min(tMinX, tMaxX));
-            tMax = Math.min(tMax, Math.max(tMinX, tMaxX));
-        } else if (P0.x < -w || P0.x > w) {
-            return null; // No intersection if the line segment is outside the extended AABB on x-axis
-        }
-
-        // Calculate t values for y-axis
-        if (dy !== 0) {
-            const tMinY = (-h - P0.y) / dy;
-            const tMaxY = (h - P0.y) / dy;
-            tMin = Math.max(tMin, Math.min(tMinY, tMaxY));
-            tMax = Math.min(tMax, Math.max(tMinY, tMaxY));
-        } else if (P0.y < -h || P0.y > h) {
-            return null; // No intersection if the line segment is outside the extended AABB on y-axis
-        }
-
-        // Calculate t values for z-axis
-        if (dz !== 0) {
-            const tMinZ = (-d - P0.z) / dz;
-            const tMaxZ = (d - P0.z) / dz;
-            tMin = Math.max(tMin, Math.min(tMinZ, tMaxZ));
-            tMax = Math.min(tMax, Math.max(tMinZ, tMaxZ));
-        } else if (P0.z < -d || P0.z > d) {
-            return null; // No intersection if the line segment is outside the extended AABB on z-axis
-        }
-
-        // Check if there is an intersection
-        if (tMin <= tMax && tMin >= 0 && tMax <= 1) {
-            return tMin; // Intersection point exists
-        }
-
-        return null; // No intersection
-    }
+    
     timeOfImpactSphereAABB(initialSpherePos, finalSpherePos, sphereRadius,
         initialAABBMin, initialAABBMax, finalAABBMin, finalAABBMax) {
 

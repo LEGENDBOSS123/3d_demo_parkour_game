@@ -13,8 +13,7 @@ var Composite = class {
         CENTER_OF_MASS: 1 << 3,
         FIXED_POSITION: 1 << 4,
         FIXED_ROTATION: 1 << 5,
-        UPDATE_ONCE: 1 << 6,
-        OCCUPIES_SPACE: 1 << 7
+        OCCUPIES_SPACE: 1 << 6
     };
 
     static SHAPES = {
@@ -154,7 +153,15 @@ var Composite = class {
         return (this.local.flags & flag) != 0;
     }
 
-    
+    canCollideWith(other) {
+        if(other.maxParent == this.maxParent) {
+            return false;
+        }
+        if(this.getLocalFlag(Composite.FLAGS.STATIC | Composite.FLAGS.KINEMATIC) && other.getLocalFlag(Composite.FLAGS.STATIC | Composite.FLAGS.KINEMATIC)) {
+            return false;
+        }
+        return true;
+    }
 
     translate(v) {
         if (this.isMaxParent()) {

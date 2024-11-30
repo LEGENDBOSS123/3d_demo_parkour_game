@@ -21,7 +21,7 @@ var TextureManager = class {
         if (specialFormat) {
             for (var extension in this.extraLoaders) {
                 if (specialFormat == extension) {
-                    this.textures.set(name, this.extraLoaders[extension](path));
+                    this.textures.set(name, this.extraLoaders[extension].load(path));
                     return this.textures.get(name).clone();
                 }
             }

@@ -6,10 +6,10 @@ var SpatialHash = class {
     constructor(options) {
         this.world = options?.world ?? null;
         this.spatialHashes = [];
-        for (var i = 0; i < (options?.gridSizes?.length ?? 20); i++) {
+        for (var i = 0; i < (options?.gridSizes?.length ?? 10); i++) {
             var spatialHash = {};
             spatialHash.hashmap = new Map();
-            spatialHash.gridSize = options?.gridSizes?.[i] ?? Math.pow(4, i) * 0.125;
+            spatialHash.gridSize = options?.gridSizes?.[i] ?? Math.pow(4, i) * 0.25;
             spatialHash.inverseGridSize = 1 / spatialHash.gridSize;
             spatialHash.threshold = options?.thresholds?.[i] ?? 8;
             spatialHash.index = i;
@@ -23,7 +23,6 @@ var SpatialHash = class {
         this.spatialHashes.push({ final: true, hashmap: this.global, next: null, index: this.spatialHashes.length });
         this.spatialHashes[this.spatialHashes.length - 2].next = this.spatialHashes[this.spatialHashes.length - 1];
         this.ids = {};
-
     }
 
     hash(cellPos) {
@@ -39,11 +38,13 @@ var SpatialHash = class {
     }
 
     _addHitbox(hitbox, id, hash = this.spatialHashes[0]) {
+        
         if (hash.final) {
             hash.hashmap.add(id);
             this.ids[id].hash = hash;
             return true;
         }
+        
         var min = this.getCellPosition(hitbox.min, hash);
         var max = this.getCellPosition(hitbox.max, hash);
         if (this.getSizeHeuristic(min, max) > hash.threshold) {
@@ -132,8 +133,8 @@ var SpatialHash = class {
             if (hash.hashmap.size == 0) {
                 return result;
             }
-            for (var i = 0; i < hash.hashmap.size; i++) {
-                result.push(hash.hashmap.keys[i]);
+            for (var i of hash.hashmap) {
+                result.add(i);
             }
             return [...(new Set(result))];
         }
