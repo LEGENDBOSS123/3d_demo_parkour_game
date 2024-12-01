@@ -33,6 +33,13 @@ var exrLoader = new EXRLoader();
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 var rgbeLoader = new RGBELoader();
 
+
+
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { N8AOPass } from './N8AO.mjs';
+
 var stats = new Stats();
 stats.showPanel(0);
 document.body.appendChild(stats.dom);
@@ -45,7 +52,6 @@ var renderer = new THREE.WebGLRenderer({
 var pmremGenerator = new THREE.PMREMGenerator(renderer);
 
 
-top.renderer = renderer;
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -54,14 +60,37 @@ renderer.physicallyCorrectLights = true;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+
+
+
+
+
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8CBED6);
 
-var camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 15000);
+var camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 4096);
 scene.add(camera);
+
+
+
+var composer = new EffectComposer(renderer);
+var renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+var n8aoPass = new N8AOPass(scene, camera, window.innerWidth, window.innerHeight);
+n8aoPass.configuration.gammaCorrection = false;
+n8aoPass.configuration.aoRadius = 4;
+n8aoPass.setQualityMode("Low");
+
+composer.addPass(n8aoPass);
+
+var outputPass = new OutputPass();
+composer.addPass( outputPass );
+
 
 window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
 });
@@ -83,21 +112,22 @@ textureManager.loadAll([
 
 
 
-
+pmremGenerator.compileEquirectangularShader();
 rgbeLoader.load("3D/Graphics/Textures/autumn_field_puresky_8k.hdr", function (texture) {
     var envMap = pmremGenerator.fromEquirectangular(texture).texture;
     scene.background = envMap;
-    scene.environment = envMap;
+    //scene.environment = envMap;
+    texture.dispose();
 })
 
 const axesHelper = new THREE.AxesHelper(100);
 scene.add(axesHelper);
 
 
-// var ambientLight = new THREE.AmbientLight(0xbbbbbb);
-// scene.add(ambientLight);
+var ambientLight = new THREE.AmbientLight(0xbbbbbb, 2);
+scene.add(ambientLight);
 
-var light = new THREE.DirectionalLight(0xffffff, 3);
+var light = new THREE.DirectionalLight(0xffffff, 1);
 light.direction = new THREE.Vector3(-2, -8, -5).normalize();
 light.castShadow = true;
 light.shadow.mapSize.width = 8192;
@@ -109,7 +139,6 @@ light.shadow.camera.left = -range;
 light.shadow.camera.right = range;
 light.shadow.camera.top = range;
 light.shadow.camera.bottom = -range;
-top.light = light;
 scene.add(light);
 scene.add(light.target);
 
@@ -228,7 +257,6 @@ gltfLoader.load('3D/Graphics/Textures/metal_grate_rusty_1k.gltf/metal_grate_rust
     var scaleFactor = 4;
     player.mesh.scale.set(player.children[0].radius * scaleFactor, player.children[0].radius * scaleFactor, player.children[0].radius * scaleFactor);
     scene.add(player.mesh);
-    top.player = player;
 });
 
 
@@ -263,7 +291,7 @@ for (var i = 0; i < 1; i++) {
                 box.setFriction(10);
                 box.setLocalFlag(Composite.FLAGS.STATIC, true);
 
-                box.mesh = child;
+                box.mesh = child.clone();
                 world.addComposite(box);
                 if (child.name.toLowerCase().includes("checkpoint") || child.name.toLowerCase().includes("spawn")) {
                     if (child.name.toLowerCase().includes("spawn")) {
@@ -278,7 +306,7 @@ for (var i = 0; i < 1; i++) {
                         }
                     }
                 }
-                scene.add(child.clone());
+                scene.add(box.mesh);
             }
             else {
             }
@@ -298,7 +326,7 @@ var fps = 20;
 var steps = 0;
 
 function render() {
-
+    stats.begin();
 
     if (keyListener.isHeld("ArrowUp") || keyListener.isHeld("KeyW")) {
         cameraControls.forward();
@@ -329,7 +357,7 @@ function render() {
     var delta = (now - start) / 1000;
     var steps2 = delta * fps;
     for (var i = 0; i < Math.floor(steps2 - steps); i++) {
-        stats.begin();
+        
         for (var child of world.composites) {
             if (!child.previousPosition) {
                 child.previousPosition = child.global.body.position.copy();
@@ -353,7 +381,7 @@ function render() {
         }
         var delta2 = cameraControls.getDelta(camera).scale(player.global.body.mass * world.deltaTime).scale(moveStrength);
         player.applyForce(delta2, player.global.body.position);
-        stats.end();
+        
 
     }
     var lerpAmount = (delta * fps - steps);
@@ -376,8 +404,9 @@ function render() {
     light.position.copy(camera.position);
     light.position.sub(light.direction.clone().multiplyScalar(light.shadow.camera.far * 0.5));
     light.target.position.addVectors(light.position, light.direction);
-    renderer.render(scene, camera);
+    composer.render();
     requestAnimationFrame(render);
+    stats.end();
 }
 
 
